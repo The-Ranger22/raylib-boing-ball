@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <raylib.h>
 #include <raymath.h>
+
+#define MAX_SPHERE_RES 256
+
 const int height = 800;
 const int width  = 800; 
 const char* title = "BoingBall";
@@ -52,15 +55,24 @@ void DrawCheckeredSphere(Vector3 centerPos, int rings, int slices, Vector3 rotat
     // 
 }
 
+
 void CS_DrawPanel3D(Vector3 centerPos, Vector2 dimension, Matrix rotationMatrix, Color color, bool drawLines){
     Vector3 points[4];
-    points[0] = Vector3Transform((Vector3){centerPos.x - dimension.x, centerPos.y - centerPos.y, centerPos.z}, rotationMatrix);
-    points[1] = Vector3Transform((Vector3){centerPos.x - dimension.x, centerPos.y + centerPos.y, centerPos.z}, rotationMatrix);
-    points[2] = Vector3Transform((Vector3){centerPos.x + dimension.x, centerPos.y - centerPos.y, centerPos.z}, rotationMatrix);
-    points[3] = Vector3Transform((Vector3){centerPos.x + dimension.x, centerPos.y + centerPos.y, centerPos.z}, rotationMatrix);
+    points[0] = Vector3Add(Vector3Transform((Vector3){-dimension.x, -dimension.y, 0.0f}, rotationMatrix), centerPos);
+    points[1] = Vector3Add(Vector3Transform((Vector3){-dimension.x, +dimension.y, 0.0f}, rotationMatrix), centerPos);
+    points[2] = Vector3Add(Vector3Transform((Vector3){+dimension.x, -dimension.y, 0.0f}, rotationMatrix), centerPos);
+    points[3] = Vector3Add(Vector3Transform((Vector3){+dimension.x, +dimension.y, 0.0f}, rotationMatrix), centerPos);
+    Vector3 pointsReversed[4];
+    for (int i = 0; i < 4; i++){
+        pointsReversed[i] = points[3-i];
+    }
+    // DrawTriangle3D(points[0], points[1], points[2],  color);
+    // DrawTriangle3D(points[2], points[0], points[1],  color);
+    // DrawTriangle3D(points[1], points[2], points[3],  color);
+    // DrawTriangle3D(points[3], points[1], points[2],  color);
 
-    DrawTriangle3D(points[0], points[1], points[2],  color);
-    DrawTriangle3D(points[1], points[2], points[3],  color);
+    DrawTriangleStrip3D(points, 4, color);
+    DrawTriangleStrip3D(pointsReversed, 4, color);
 
     if (drawLines) {
         DrawLine3D(points[0], points[1], BLACK);
@@ -69,6 +81,58 @@ void CS_DrawPanel3D(Vector3 centerPos, Vector2 dimension, Matrix rotationMatrix,
         DrawLine3D(points[3], points[1], BLACK);
         DrawLine3D(points[0], points[2], BLACK);
     }
+}
+
+void CS_DrawSphere(int degrees, int rings, float scale, Vector3 centerPos, Matrix rotationMat, Color color){
+    Vector3 points[MAX_SPHERE_RES];
+    if (360 % degrees != 0) {
+        printf("Value `%d` is not a factor of 360. Returning without drawing sphere.\n", degrees);
+        return;
+    }
+    if ((360/degrees)*rings > MAX_SPHERE_RES) {
+        printf("Number of points generated too high. Returning without drawing sphere.\n");
+    }
+
+    /*
+        [
+            a1, b1, c1, d1,
+            a2, b2, c2, d2,
+            a3, b3, c3, d3,
+            a4, b4, c4, d4
+        ]
+        vs.
+        [
+            a1, a2, a3, a4,
+            b1, b2, b3, b4,
+            c1, c2, c3, c4,
+            d1, d2, d3, d4
+        ]
+    */
+    unsigned int c = 0;
+    unsigned int sectors = 360/degrees;
+    unsigned int total_num_points = sectors * rings;
+    float step = 1.0f/(float)rings;
+    for (float v = 0; v <= 1; v += step) {
+        float x = cos(v*PI);
+        float y = sin(v*PI);
+        points[c] = (Vector3){x, y, 0.0f};
+        c++;
+    }
+    for (unsigned int idx = 1; idx < sectors; idx++){
+        for (unsigned jdx = 0; jdx < rings; jdx++){
+            // printf("indexer: %d\n", idx*rings + jdx);
+            points[idx*rings + jdx] = Vector3RotateByAxisAngle(points[jdx], (Vector3){0.0f, 0.1f, 0.0f}, degrees * (float) idx * DEG2RAD);
+        }
+    }
+    // printf("total_points: %d\n", total_num_points);
+    // for 
+    // Draw Points
+    for (unsigned int adx = 0; adx < total_num_points; adx++){
+        DrawPoint3D(points[adx], color);
+    }
+    
+
+//    for () 
 }
 
 int main(){
@@ -102,10 +166,19 @@ int main(){
     Vector3 spherePos = Vector3Add(sceneOrigin, (Vector3){0.0f, 0.0f, 0.0f});
     
     // Sphere Mesh
-
+    
     const Vector3 panelPos = {1.0f, 1.0f, 0.0f};
-    const Vector2 panelDims = {0.05f, 0.05f};
+    const Vector2 panelDims = {0.3f, 0.3f};
+    const Vector3 rotationVec = {0.1f, 0.9f, 0.0f};
     float angle = 0.0f;
+
+
+    Vector3 testPoints[] = {
+        {1.5f, 1.5f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {1.0f, 1.0f, 0.0f},
+        {0.5f, 0.5f, 0.0f}
+    };
 
     while (!WindowShouldClose()) {
         // if (gcurr <= glower || gcurr >= gupper){
@@ -113,6 +186,7 @@ int main(){
         // }
         BeginDrawing();
             ClearBackground(GRAY);
+            DrawFPS(50, 50);
             BeginMode3D(camera);
                 DrawLineGrid(
                     gridPos,
@@ -120,15 +194,14 @@ int main(){
                     gridSpacing,
                     MAGENTA
                 );
-
-                DrawSphereEx(spherePos, sphereRadius, sphereRings, sphereSlices, RED);
-                DrawSphereWires(spherePos, sphereRadius, sphereRings, sphereSlices, WHITE);
+                // DrawSphereEx(spherePos, sphereRadius, sphereRings, sphereSlices, RED);
+                // DrawSphereWires(spherePos, sphereRadius, sphereRings, sphereSlices, WHITE);
                 // DrawSphere(ballPos, 50.0f, RED);
                 // DrawPoint3D(ballPos, RED);
-                
-                CS_DrawPanel3D(panelPos, panelDims, MatrixRotateY(angle*DEG2RAD), BLUE, true);
-                
-                angle += 0.5f; 
+                CS_DrawPanel3D(panelPos, panelDims, MatrixRotate(rotationVec, angle*DEG2RAD), BLUE, true);
+                CS_DrawSphere(30, 8, 1.0f, spherePos, MatrixRotate(rotationVec, angle*DEG2RAD), GREEN);
+                //DrawTriangleStrip3D(testPoints, 4, RED); 
+                angle += 1.0f; 
             EndMode3D();
         EndDrawing();
         // gcurr += gstep;
