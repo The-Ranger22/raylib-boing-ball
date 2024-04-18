@@ -8,6 +8,7 @@ const int height = 800;
 const int width  = 800; 
 const char* title = "BoingBall";
 const int FPS = 60;
+const float GRAVITY = 0.001;
 
 
 struct Axis {
@@ -83,71 +84,62 @@ void CS_DrawPanel3D(Vector3 centerPos, Vector2 dimension, Matrix rotationMatrix,
     }
 }
 
-void CS_DrawSphere(int degrees, int rings, float scale, Vector3 centerPos, Matrix rotationMat, Color color){
-    Vector3 points[MAX_SPHERE_RES];
+
+float map_into_range(float inp, Vector2 input_range, Vector2 output_range){
+    return output_range.x + ((output_range.y - output_range.x)/(input_range.y - input_range.x)) * (inp - input_range.x);
+}
+
+int CS_BuildSphere(Vector3 * points, int size, int degrees, int rings){
     if (360 % degrees != 0) {
         printf("Value `%d` is not a factor of 360. Returning without drawing sphere.\n", degrees);
-        return;
+        return -1;
     }
-    if ((360/degrees)*rings > MAX_SPHERE_RES) {
+    if ((360/degrees)*(rings) > MAX_SPHERE_RES) {
         printf("Number of points generated too high. Returning without drawing sphere.\n");
+        return -2;
     }
-
-    /*
-        [
-            a1, b1, c1, d1,
-            a2, b2, c2, d2,
-            a3, b3, c3, d3,
-            a4, b4, c4, d4
-        ]
-        vs.
-        [
-            a1, a2, a3, a4,
-            b1, b2, b3, b4,
-            c1, c2, c3, c4,
-            d1, d2, d3, d4
-        ]
-    */
     unsigned int c = 0;
     unsigned int sectors = 360/degrees;
     unsigned int total_num_points = sectors * rings;
-    float step = 1.0f/(float)rings;
-    for (float v = 0.0f; v <= 1; v += step) {
+    if (total_num_points > size){
+        printf("Vector3 Buffer is not big enought.");
+        return -3;
+    }
+    float step = 1.0f/((float)(rings));
+    for (int i = 0; i < rings; i++) {
+        float v = map_into_range((float) i, (Vector2){0.0f, (float)(rings-1)}, (Vector2){0.0f, 1.0f});
         float x = cos((v * 180 - 90) * DEG2RAD);
         float y = sin((v * 180 - 90) * DEG2RAD);
         Vector3 p = {x, y, 0.0f};
         points[c] = p;
         points[total_num_points+c] = p;
         c++;
+        printf("rings: %d, step: %.6f, v: %.6f, x: %.6f, y: %.6f\n", rings, step, v, x, y);
     }
     for (unsigned int idx = 1; idx < sectors; idx++){
+        // printf("[------]\n");
         for (unsigned jdx = 0; jdx < rings; jdx++){
             // printf("indexer: %d\n", idx*rings + jdx);
-            Vector3 point = Vector3RotateByAxisAngle(points[jdx], (Vector3){0.0f, 0.1f, 0.0f}, (degrees) * (float) idx * DEG2RAD);
-            point = Vector3Scale(point, scale);
-            point = Vector3Transform(point, rotationMat);
-            point = Vector3Add(point, centerPos);
-            points[idx*rings + jdx] = point;
+            // printf("Degrees: %.2f\n", degrees*(float) idx);
+            points[idx*rings + jdx] = Vector3RotateByAxisAngle(points[jdx], (Vector3){0.0f, 0.1f, 0.0f}, (degrees) * (float) idx * DEG2RAD);
         }
     }
     for (unsigned jdx = 0; jdx < rings; jdx++){
         // printf("indexer: %d\n", idx*rings + jdx);
-        Vector3 point = points[jdx];
-        point = Vector3Scale(point, scale);
-        point = Vector3Transform(point, rotationMat);
-        point = Vector3Add(point, centerPos);
-        points[jdx] = point;
-        points[total_num_points + jdx] = point;
+        points[total_num_points + jdx] = points[jdx];
     }
-    printf("total_points: %d\n", total_num_points);
-    // for 
-    // Draw Points
-    for (unsigned int adx = 0; adx < total_num_points; adx++){
-        DrawPoint3D(points[adx], BLACK);
-    }
+    return sectors;
+}
+
+Vector3 CS_TransformRotateScaleVec3(Vector3 point, Vector3 centerPos, Matrix transformMat, float scale){
+    Vector3 transformedPoint = Vector3Scale(point, scale);
+    transformedPoint = Vector3Transform(transformedPoint, transformMat);
+    transformedPoint = Vector3Add(transformedPoint, centerPos);
+    return transformedPoint;
+}
+
+void CS_DrawSphere(const Vector3 * points, int sectors, int rings, float scale, Vector3 centerPos, Matrix rotationMat, Color color){
     for (unsigned int adx = 0; adx < sectors; adx++) {
-        
-        
         for (unsigned int bdx = 0; bdx < rings - 1; bdx++){
             // DrawLine3D(points[adx*sectors+bdx], points[(adx+1)*sectors+bdx])
 
@@ -163,15 +155,20 @@ void CS_DrawSphere(int degrees, int rings, float scale, Vector3 centerPos, Matri
             } else {
                 aColor = (adx*rings + bdx) % 2 == 0 ? (WHITE) : (RED);
             } 
-
-            DrawTriangle3D(points[adx*rings + bdx], points[(adx+1)*rings+bdx], points[adx*rings+bdx+1], aColor);
-            DrawTriangle3D(points[(adx)*rings+bdx+1], points[(adx+1)*rings+bdx], points[(adx+1)*rings+bdx+1], aColor);
+            Vector3 p1, p2, p3, p4;
             
-            DrawLine3D(points[adx*rings + bdx], points[(adx+1)*rings+bdx], BLACK);
-            DrawLine3D(points[adx*rings + bdx], points[(adx)*rings+bdx + 1], BLACK);
-            // DrawLine3D(points[(adx+1)*rings + bdx], points[(adx)*rings+bdx+1], BLACK);
-            DrawLine3D(points[adx*rings + bdx+1], points[(adx+1)*rings+bdx+1], BLACK);
-            DrawLine3D(points[(adx+1)*rings + bdx + 1], points[(adx+1)*rings+bdx], BLACK);
+            p1 = CS_TransformRotateScaleVec3(points[adx*rings + bdx]    , centerPos, rotationMat, scale);
+            p2 = CS_TransformRotateScaleVec3(points[(adx+1)*rings + bdx], centerPos, rotationMat, scale);
+            p3 = CS_TransformRotateScaleVec3(points[adx*rings + bdx + 1], centerPos, rotationMat, scale);
+            p4 = CS_TransformRotateScaleVec3(points[(adx+1)*rings+bdx+1], centerPos, rotationMat, scale);
+            
+            DrawTriangle3D(p1, p2, p3, aColor);
+            DrawTriangle3D(p3, p2, p4, aColor);
+            
+            DrawLine3D(p1, p2, BLACK);
+            DrawLine3D(p1, p3, BLACK);
+            DrawLine3D(p3, p4, BLACK);
+            DrawLine3D(p4, p2, BLACK);
 
             // printf("[----]\n");
             // printf("p1: %d p2 %d\n", adx*rings + bdx, (adx+1)*rings + bdx); // E1(n1, n2)
@@ -182,9 +179,22 @@ void CS_DrawSphere(int degrees, int rings, float scale, Vector3 centerPos, Matri
         }
     }
     
-    
-
 //    for () 
+}
+
+
+void processPhysics(Vector3* pos, Vector3* velocity, Vector3* rotation, float mass, BoundingBox obj, BoundingBox top, BoundingBox bottom, BoundingBox left, BoundingBox right){
+    if(CheckCollisionBoxes(obj, top) || CheckCollisionBoxes(obj, bottom)){
+        velocity->y = -(velocity->y);
+    }
+    if(CheckCollisionBoxes(obj, left) || CheckCollisionBoxes(obj, right)){
+        velocity->x = -(velocity->x);
+        rotation->x = -(rotation->x);
+        rotation->y = -(rotation->y);
+        rotation->z = -(rotation->z);
+    }
+    pos->x += velocity->x;
+    pos->y += velocity->y;
 }
 
 int main(){
@@ -212,18 +222,46 @@ int main(){
     const Vector2 gridSpacing = {7.5f, 5.0f};
 
     //define sphere dimensions
+    Vector3 sphereBuff[512];
     const float sphereRadius = 0.4f;
-    const int sphereRings = 10;
-    const int sphereSlices = 8;
+    const int sphereRings = 12;
+    const int sphereDegrees = 15;
+    const int sphereSectors = CS_BuildSphere(sphereBuff, 512, sphereDegrees, sphereRings);
+    const float sphereScale = 0.35f;
     Vector3 spherePos = Vector3Add(sceneOrigin, (Vector3){-0.5f, 0.0f, 0.0f});
+    for (unsigned int idx = 0; idx < sphereRings*2; idx++){
+        printf("[%3d] x: %.2f y: %.2f z: %.2f\n", idx, sphereBuff[idx].x, sphereBuff[idx].y, sphereBuff[idx].z);
+    }
+
+    Vector3 movementVector = {0.005f, 0.005f, 0.0f};
+    Quaternion bounds = {-1.0f, -1.0f, 5.0f, 5.0f};
+    BoundingBox sphereBB;
+    BoundingBox bb_bottom = {
+        (Vector3){-1.2f, -0.41f, 0.0f},
+        (Vector3){ 1.2f, -0.41f, 0.0f}
+    };
+    BoundingBox bb_top = {
+        (Vector3){-1.2f, 0.9f, 0.0f},
+        (Vector3){ 1.2f, 0.9f, 0.0f}
+    };
+    BoundingBox bb_left = {
+        (Vector3){1.2f, -0.41f, 0.0f},
+        (Vector3){1.2f, 0.9f, 0.0f}
+    };
+    BoundingBox bb_right = {
+        (Vector3){-1.2f, -0.41f, 0.0f},
+        (Vector3){-1.2f, 0.9f, 0.0f}
+    };
+
+
     
+
     // Sphere Mesh
     
     const Vector3 panelPos = {1.0f, 1.0f, 0.0f};
     const Vector2 panelDims = {0.3f, 0.3f};
-    const Vector3 rotationVec = {0.1f, 0.9f, 0.0f};
+    const Vector3 rotationVec = {0.0f, 0.1f, 0.0f};
     float angle = 0.0f;
-
 
     Vector3 testPoints[] = {
         {1.5f, 1.5f, 0.0f},
@@ -246,12 +284,19 @@ int main(){
                     gridSpacing,
                     MAGENTA
                 );
-                // DrawSphereEx(spherePos, sphereRadius, sphereRings, sphereSlices, RED);
-                // DrawSphereWires(spherePos, sphereRadius, sphereRings, sphereSlices, WHITE);
-                // DrawSphere(ballPos, 50.0f, RED);
-                // DrawPoint3D(ballPos, RED);
-                CS_DrawPanel3D(panelPos, panelDims, MatrixRotate(rotationVec, angle*DEG2RAD), BLUE, true);
-                CS_DrawSphere(15, 12, 0.5f, spherePos, MatrixRotate(rotationVec, angle*DEG2RAD), GREEN);
+                // CS_DrawPanel3D(panelPos, panelDims, MatrixRotate(rotationVec, angle*DEG2RAD), BLUE, true);
+                sphereBB = (BoundingBox){
+                    (Vector3){spherePos.x-sphereScale, spherePos.y-sphereScale, 0.0f},
+                    (Vector3){spherePos.x+sphereScale, spherePos.y+sphereScale, 0.0f}
+                };
+                processPhysics(&spherePos, &movementVector, &rotationVec, 1.0f, sphereBB, bb_top, bb_bottom, bb_left, bb_right);
+                DrawBoundingBox(sphereBB, (CheckCollisionBoxes(bb_top, sphereBB) ? RED : GREEN));
+                DrawBoundingBox(bb_top, GREEN);
+                DrawBoundingBox(bb_bottom, GREEN);
+                DrawBoundingBox(bb_left, GREEN);
+                DrawBoundingBox(bb_right, GREEN);
+                CS_DrawSphere(sphereBuff, sphereSectors, sphereRings, sphereScale, spherePos, MatrixRotate(rotationVec, angle*DEG2RAD), GREEN);
+                
                 //DrawTriangleStrip3D(testPoints, 4, RED); 
                 angle += 1.0f;
             EndMode3D();
