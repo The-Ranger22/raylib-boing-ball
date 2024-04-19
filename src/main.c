@@ -114,7 +114,6 @@ int CS_BuildSphere(Vector3 * points, int size, int degrees, int rings){
         points[c] = p;
         points[total_num_points+c] = p;
         c++;
-        printf("rings: %d, step: %.6f, v: %.6f, x: %.6f, y: %.6f\n", rings, step, v, x, y);
     }
     for (unsigned int idx = 1; idx < sectors; idx++){
         // printf("[------]\n");
@@ -171,12 +170,6 @@ void CS_DrawSphere(const Vector3 * points, int sectors, int rings, float scale, 
             // DrawLine3D(p3, p4, BLACK);
             // DrawLine3D(p4, p2, BLACK);
 
-            // printf("[----]\n");
-            // printf("p1: %d p2 %d\n", adx*rings + bdx, (adx+1)*rings + bdx); // E1(n1, n2)
-            // printf("p1: %d p2 %d\n", adx*rings + bdx,   (adx)*rings + bdx + 1); // E2(n1, n3)
-            // printf("p1: %d p2 %d\n", (adx+1)*rings + bdx, (adx)*rings + bdx + 1); // E3(n2, n3)
-            // printf("p1: %d p2 %d\n", adx*rings + bdx + 1, (adx+1)*rings + bdx + 1); // E4(n3, n4)
-            // printf("p1: %d p2 %d\n", (adx+1)*rings + bdx + 1, (adx+1)*rings + bdx); // E5(n2, n4)
         }
     }
     
@@ -244,9 +237,6 @@ int main(){
     const int sphereSectors = CS_BuildSphere(sphereBuff, 512, sphereDegrees, sphereRings);
     const float sphereScale = 1.25f;
     Vector3 spherePos = Vector3Add(sceneOrigin, (Vector3){-0.5f, 0.0f, 0.0f});
-    for (unsigned int idx = 0; idx < sphereRings*2; idx++){
-        printf("[%3d] x: %.2f y: %.2f z: %.2f\n", idx, sphereBuff[idx].x, sphereBuff[idx].y, sphereBuff[idx].z);
-    }
 
     Vector3 movementVector = {0.02f, 0.02f, 0.0f};
     Quaternion bounds;
@@ -288,11 +278,13 @@ int main(){
     
     Vector3 axisRotation = {0.0f, 0.0f, 1.0f};
     float axisRotationAngle = 15.0f*DEG2RAD;
-
+    bool dispFPS = false;
     while (!WindowShouldClose()) {
+        if (IsKeyPressed(KEY_TAB)) ToggleFullscreen();
+        if (IsKeyPressed(KEY_LEFT_ALT)) dispFPS = !dispFPS;
         BeginDrawing();
             ClearBackground(GRAY);
-            DrawFPS(50, 50);
+            if (dispFPS) DrawFPS(50, 50);
             char posText[32];
             sprintf(posText, "X: %.3f Y: %.3f");
             BeginMode3D(camera);
@@ -310,7 +302,6 @@ int main(){
                 
                 int impact = processPhysics(&spherePos, &movementVector, 0.09f, &rotationVec, 1.0f, &rotationStep, sphereBB, bb_top, bb_bottom, bb_left, bb_right);
                 if (impact) {
-                    printf("Impact!\n");
                     PlaySound(thud);
                 }
                 // DrawBoundingBox(sphereBB, (CheckCollisionBoxes(bb_top, sphereBB) ? RED : GREEN));
