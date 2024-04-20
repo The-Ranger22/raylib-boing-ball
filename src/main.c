@@ -279,9 +279,11 @@ int main(){
     Vector3 axisRotation = {0.0f, 0.0f, 1.0f};
     float axisRotationAngle = 15.0f*DEG2RAD;
     bool dispFPS = false;
+    bool isPaused = false;
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_TAB)) ToggleFullscreen();
         if (IsKeyPressed(KEY_LEFT_ALT)) dispFPS = !dispFPS;
+        if (IsKeyPressed(KEY_SPACE)) isPaused = !isPaused;
         BeginDrawing();
             ClearBackground(GRAY);
             if (dispFPS) DrawFPS(50, 50);
@@ -299,10 +301,12 @@ int main(){
                     (Vector3){spherePos.x-sphereScale, spherePos.y-sphereScale, 0.0f},
                     (Vector3){spherePos.x+sphereScale, spherePos.y+sphereScale, 0.0f}
                 };
-                
-                int impact = processPhysics(&spherePos, &movementVector, 0.09f, &rotationVec, 1.0f, &rotationStep, sphereBB, bb_top, bb_bottom, bb_left, bb_right);
-                if (impact) {
-                    PlaySound(thud);
+                if (!isPaused){
+                    int impact = processPhysics(&spherePos, &movementVector, 0.09f, &rotationVec, 1.0f, &rotationStep, sphereBB, bb_top, bb_bottom, bb_left, bb_right);
+                    if (impact) {
+                        PlaySound(thud);
+                    }
+                    angle += rotationStep;
                 }
                 // DrawBoundingBox(sphereBB, (CheckCollisionBoxes(bb_top, sphereBB) ? RED : GREEN));
                 // DrawBoundingBox(bb_top, GREEN);
@@ -312,7 +316,6 @@ int main(){
                 CS_DrawSphere(sphereBuff, sphereSectors, sphereRings, sphereScale, spherePos, MatrixRotate(rotationVec, angle*DEG2RAD), axisRotation, axisRotationAngle, GREEN);
                 // DrawText(posText, 50, 50, 16, GREEN);
                 //DrawTriangleStrip3D(testPoints, 4, RED); 
-                angle += rotationStep;
             EndMode3D();
         EndDrawing();
         // gcurr += gstep;
