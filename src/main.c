@@ -11,17 +11,6 @@ const int FPS = 60;
 const float GRAVITY = 0.002;
 
 
-struct Axis {
-    Vector3 p1;
-    Vector3 p2;
-};
-
-struct Triangle {
-
-};
-
-
-
 void DrawRotatedLineGrid(Vector3 centerPos, Vector2 dimensions, Vector2 spacing, Color color, Matrix rotation){
     if (spacing.x <= 0.0f || spacing.y <= 0.0f){
         spacing.x = 0.1f;
@@ -52,11 +41,6 @@ void DrawLineGrid(Vector3 centerPos, Vector2 dimensions, Vector2 spacing, Color 
     DrawRotatedLineGrid(centerPos, dimensions, spacing, color, mat);
 }
 
-void DrawCheckeredSphere(Vector3 centerPos, int rings, int slices, Vector3 rotation, Color c1, Color c2){
-    // 
-}
-
-
 void CS_DrawPanel3D(Vector3 centerPos, Vector2 dimension, Matrix rotationMatrix, Color color, bool drawLines){
     Vector3 points[4];
     points[0] = Vector3Add(Vector3Transform((Vector3){-dimension.x, -dimension.y, 0.0f}, rotationMatrix), centerPos);
@@ -83,7 +67,6 @@ void CS_DrawPanel3D(Vector3 centerPos, Vector2 dimension, Matrix rotationMatrix,
         DrawLine3D(points[0], points[2], BLACK);
     }
 }
-
 
 float map_into_range(float inp, Vector2 input_range, Vector2 output_range){
     return output_range.x + ((output_range.y - output_range.x)/(input_range.y - input_range.x)) * (inp - input_range.x);
@@ -172,8 +155,6 @@ void CS_DrawSphere(const Vector3 * points, int sectors, int rings, float scale, 
 
         }
     }
-    
-//    for () 
 }
 
 
